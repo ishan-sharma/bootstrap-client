@@ -2,6 +2,7 @@ package com.flipkart.planning;
 
 import flipkart.dsp.santa.bernard.model.pricing.PricingNotificationKafkaMessage;
 import flipkart.pricing.libs.fatak.PriceResponseV2;
+import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
@@ -17,10 +18,14 @@ import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.StringSerializer;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.Properties;
 import java.io.IOException;
+import java.util.UUID;
 
 public class BootStrapMapper extends Mapper<LongWritable, Text, Text, Text> {
     private KafkaProducer<String, PricingNotificationKafkaMessage> kafkaProducer = null;
@@ -57,34 +62,74 @@ public class BootStrapMapper extends Mapper<LongWritable, Text, Text, Text> {
                         ,pricingNotificationKafkaMessage);
 
         try {
-            String endpoint = "http://10.47.0.106:80/v2/listings/"+line;
+            PriceResponseV2 priceResponseV2 = getFatakResponse(line);
 
-            HttpURLConnection connection;
-            URL url = new URL(endpoint);
-            connection = (HttpURLConnection) url.openConnection();
-            connection.setRequestMethod("GET");
-            connection.setRequestProperty("X-Flipkart-Client", "kaizen");
-            connection.setRequestProperty("X-Request-ID", "dummy");
-            connection.setRequestProperty("X-Request-Host", "test");
-            connection.connect();
+            if(priceResponseV2!=null && priceResponseV2.getSuccess().size()==1 && priceResponseV2.getFailure().size()==0)
+            {
+                ZuluViewResponse zuluViewResponse = getZuluViewResponse(line);
 
-            if(connection.getResponseCode() == 200) {
-                System.out.println("response is " + connection.getResponseMessage());
-                System.out.println("executing request");
-                System.out.println(producerRecord.value().getListingId());
-                if(kafkaProducer == null) {
-                    System.out.println("kafkaproducer is null");
+                if ((zuluViewResponse != null && zuluViewResponse.getEntityViews().size() == 1
+                        && zuluViewResponse.getUnavailableViews().size() == 0)) {
+                    kafkaProducer.send(producerRecord).get();
                 }
-                kafkaProducer.send(producerRecord);
+                else {
+                    //TODO: to write in line variable in HDFS
+                    context.write(new Text(line), new Text("1"));
+                }
             }
-            else {
-                System.out.println("request failed for " + line);
-                System.out.println("error code is " + connection.getResponseCode());
-            }
-
         }
         catch (Exception e) {
             System.out.println("request failed");
+        }
+    }
+
+    private PriceResponseV2 getFatakResponse(String listingId) throws IOException {
+        String endpoint = "http://10.47.0.106:80/v2/listings/" + listingId;
+
+        HttpURLConnection connection;
+        URL url = new URL(endpoint);
+        connection = (HttpURLConnection) url.openConnection();
+        connection.setRequestMethod("GET");
+        connection.setRequestProperty("X-Flipkart-Client", "kaizen");
+        connection.setRequestProperty("X-Request-ID", "dummy");
+        connection.setRequestProperty("X-Request-Host", "test");
+        connection.connect();
+
+        if(connection.getResponseCode() == 200) {
+            BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(connection.getInputStream()));
+            String message = IOUtils.toString(bufferedReader);
+
+            PriceResponseV2 priceResponseV2 = new ObjectMapper().readValue(message,PriceResponseV2.class);
+            return priceResponseV2;
+        }
+        else {
+            System.out.println("fatak request failed for " + listingId);
+            return null;
+        }
+    }
+
+    private ZuluViewResponse getZuluViewResponse(String listingId) throws IOException {
+        String endpoint = "http://10.47.1.8:31200/views?viewNames=dsp_pricing&entityIds=" + listingId;
+
+        HttpURLConnection connection;
+        URL url = new URL(endpoint);
+        connection = (HttpURLConnection) url.openConnection();
+        connection.setRequestMethod("GET");
+        connection.setRequestProperty("z-clientId", "retail.pricing");
+        connection.setRequestProperty("z-requestId", String.valueOf(UUID.randomUUID()));
+        connection.setRequestProperty("z-timestamp", String.valueOf(System.currentTimeMillis()));
+        connection.connect();
+
+        if(connection.getResponseCode() == 200) {
+            BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(connection.getInputStream()));
+            String message = IOUtils.toString(bufferedReader);
+
+            ZuluViewResponse zuluViewResponse = new ObjectMapper().readValue(message,ZuluViewResponse.class);
+            return zuluViewResponse;
+        }
+        else {
+            System.out.println("zulu request failed for " + listingId + "response code " + connection.getResponseCode());
+            return null;
         }
     }
 }
