@@ -34,8 +34,7 @@ public class BootStrapMapper extends Mapper<LongWritable, Text, Text, Text> {
     protected void setup(Mapper<LongWritable, Text, Text, Text>.Context context) throws IOException, InterruptedException {
         super.setup(context);
         Properties props = new Properties();
-        props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG,
-                "10.33.167.111:9092");
+        props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, "10.33.97.199:9092,10.33.89.206:9092,10.33.77.166:9092,10.33.37.218:9092,10.33.49.208:9092");
         props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG,
                 StringSerializer.class.getName());
         props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG,
@@ -131,5 +130,12 @@ public class BootStrapMapper extends Mapper<LongWritable, Text, Text, Text> {
             System.out.println("zulu request failed for " + listingId + "response code " + connection.getResponseCode());
             return null;
         }
+    }
+
+    @Override
+    protected void cleanup(Context context) throws IOException, InterruptedException {
+        super.cleanup(context);
+        Thread.sleep(5000);
+        kafkaProducer.close();
     }
 }
