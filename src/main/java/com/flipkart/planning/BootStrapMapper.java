@@ -46,8 +46,8 @@ public class BootStrapMapper extends Mapper<LongWritable, Text, Text, Text> {
     @Override
     protected void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException {
         String line = value.toString();
-        System.out.println("Executing line " + line);
-        System.out.println(line);
+//        System.out.println("Executing line " + line);
+//        System.out.println(line);
 
 
         PricingNotificationKafkaMessage pricingNotificationKafkaMessage = new PricingNotificationKafkaMessage(
