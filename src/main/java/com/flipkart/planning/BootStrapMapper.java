@@ -55,15 +55,15 @@ public class BootStrapMapper extends Mapper<LongWritable, Text, Text, Text> {
         if(batchSize < 30) {
             return;
         }
-        System.out.println("Executing line " + line);
-        System.out.println(line);
+//        System.out.println("Executing line " + line);
+//        System.out.println(line);
 
         String commaSeparatedListingIds = listingIds.stream().collect(Collectors.joining(","));
         try {
             PriceResponseV2 priceResponseV2 = getFatakResponse(commaSeparatedListingIds);
             if(priceResponseV2 == null)
             {
-                context.write(new Text("FatakTimeout:"+commaSeparatedListingIds), new Text("1"));
+                context.write(new Text(commaSeparatedListingIds), new Text("F"));
                 batchSize = 0;
                 listingIds.clear();
                 return;
@@ -76,7 +76,7 @@ public class BootStrapMapper extends Mapper<LongWritable, Text, Text, Text> {
             String commaSeparatedListingIdsForZulu = fatakListings.stream().collect(Collectors.joining(","));
             ZuluViewResponse zuluViewResponse = getZuluViewResponse(commaSeparatedListingIdsForZulu);
             if (zuluViewResponse == null) {
-                context.write(new Text("ZuluTimeout:"+commaSeparatedListingIdsForZulu), new Text("1"));
+                context.write(new Text(commaSeparatedListingIdsForZulu), new Text("Z"));
             } else {
                 zuluViewResponse.getEntityViews().forEach((EntityView entityView) -> {
                     String listingId = entityView.getEntityId();
@@ -94,7 +94,7 @@ public class BootStrapMapper extends Mapper<LongWritable, Text, Text, Text> {
                 });
                 //TODO: log entity id in hdfs file no 3 unavailableView.getEntityId(); (for zulu view not available)
                 for (UnavailableView unavailableView : zuluViewResponse.getUnavailableViews()) {
-                    context.write(new Text("ZuluViewUnavailable:" + unavailableView.getEntityId()), new Text("1"));
+                    context.write(new Text(unavailableView.getEntityId()), new Text("UZ"));
                 }
             }
 
@@ -187,7 +187,7 @@ public class BootStrapMapper extends Mapper<LongWritable, Text, Text, Text> {
         Thread.sleep(5000);
         kafkaProducer.close();
         for(String listingId: listingIds) {
-            context.write(new Text("IncompleteBatch:" + listingId), new Text("1"));
+            context.write(new Text(listingId), new Text("I"));
         }
         super.cleanup(context);
     }
