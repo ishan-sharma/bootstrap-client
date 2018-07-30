@@ -88,7 +88,7 @@ public class BootStrapMapper extends Mapper<LongWritable, Text, Text, Text> {
 
                     ProducerRecord<String, PricingNotificationKafkaMessage> producerRecord =
                             new ProducerRecord<>("tac-listing-updates-bootstrap"
-                                    , line
+                                    , listingId
                                     , pricingNotificationKafkaMessage);
                     kafkaProducer.send(producerRecord);
                 });
