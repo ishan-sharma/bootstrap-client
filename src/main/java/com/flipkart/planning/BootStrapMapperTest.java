@@ -116,17 +116,21 @@ public class BootStrapMapperTest {
         connection.setConnectTimeout(2000);
         PriceResponseV2 priceResponseV2 = null;
         for (int retry = 0; retry < 10; retry++) {
-            connection.connect();
-            if (connection.getResponseCode() == 200) {
-                BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(connection.getInputStream()));
-                String message = IOUtils.toString(bufferedReader);
-                priceResponseV2 = new ObjectMapper().readValue(message, PriceResponseV2.class);
+            try {
+                connection.connect();
+                if (connection.getResponseCode() == 200) {
+                    BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(connection.getInputStream()));
+                    String message = IOUtils.toString(bufferedReader);
+                    priceResponseV2 = new ObjectMapper().readValue(message, PriceResponseV2.class);
+                    connection.disconnect();
+                    return priceResponseV2;
+                } else {
+                    System.out.println("fatak request retry for " + listingIds);
+                }
                 connection.disconnect();
-                return priceResponseV2;
-            } else {
-                System.out.println("fatak request retry for " + listingIds);
+            } catch (Exception e) {
+                continue;
             }
-            connection.disconnect();
         }
         System.out.println("fatak retry exhausted for " + listingIds);
         return null;
@@ -147,18 +151,22 @@ public class BootStrapMapperTest {
         connection.setConnectTimeout(2000);
         ZuluViewResponse zuluViewResponse = null;
         for (int retry = 0; retry < 10; retry++) {
-            connection.connect();
-            if (connection.getResponseCode() == 200) {
-                BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(connection.getInputStream()));
-                String message = IOUtils.toString(bufferedReader);
+            try {
+                connection.connect();
+                if (connection.getResponseCode() == 200) {
+                    BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(connection.getInputStream()));
+                    String message = IOUtils.toString(bufferedReader);
 
-                zuluViewResponse = new ObjectMapper().readValue(message, ZuluViewResponse.class);
+                    zuluViewResponse = new ObjectMapper().readValue(message, ZuluViewResponse.class);
+                    connection.disconnect();
+                    return zuluViewResponse;
+                } else {
+                    System.out.println("zulu request retry for " + listingIds);
+                }
                 connection.disconnect();
-                return zuluViewResponse;
-            } else {
-                System.out.println("zulu request retry for " + listingIds);
+            } catch (Exception e) {
+                continue;
             }
-            connection.disconnect();
         }
         System.out.println("zulu retry exhausted for " + listingIds);
         return null;

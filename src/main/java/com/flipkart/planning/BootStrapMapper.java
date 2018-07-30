@@ -29,6 +29,7 @@ public class BootStrapMapper extends Mapper<LongWritable, Text, Text, Text> {
     private List<String> listingIds = new ArrayList<>();
     private int batchSize = 0;
 
+
     @Override
     protected void setup(Mapper<LongWritable, Text, Text, Text>.Context context) throws IOException, InterruptedException {
         super.setup(context);
@@ -52,8 +53,7 @@ public class BootStrapMapper extends Mapper<LongWritable, Text, Text, Text> {
         batchSize++;
 
         if(batchSize < 30) {
-            //TODO: identify weather system.exit is correct ?
-            System.exit(0);
+            return;
         }
         System.out.println("Executing line " + line);
         System.out.println(line);
@@ -64,7 +64,7 @@ public class BootStrapMapper extends Mapper<LongWritable, Text, Text, Text> {
             if(priceResponseV2 == null)
             {
                 context.write(new Text("FatakTimeout:"+commaSeparatedListingIds), new Text("1"));
-                System.exit(0);
+                return;
             }
             else {
                 priceResponseV2.getSuccess().forEach((PriceObject priceObject) ->
@@ -124,7 +124,8 @@ public class BootStrapMapper extends Mapper<LongWritable, Text, Text, Text> {
         connection.setConnectTimeout(2000);
         PriceResponseV2 priceResponseV2 = null;
         for (int retry = 0; retry < 10; retry++) {
-            connection.connect();
+            try {
+                connection.connect();
             if (connection.getResponseCode() == 200) {
                 BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(connection.getInputStream()));
                 String message = IOUtils.toString(bufferedReader);
@@ -135,6 +136,9 @@ public class BootStrapMapper extends Mapper<LongWritable, Text, Text, Text> {
                 System.out.println("fatak request retry for " + listingIds);
             }
             connection.disconnect();
+            } catch (Exception e) {
+                continue;
+            }
         }
         System.out.println("fatak retry exhausted for " + listingIds);
         return null;
@@ -155,18 +159,22 @@ public class BootStrapMapper extends Mapper<LongWritable, Text, Text, Text> {
         connection.setConnectTimeout(2000);
         ZuluViewResponse zuluViewResponse = null;
         for (int retry = 0; retry < 10; retry++) {
-            connection.connect();
-            if (connection.getResponseCode() == 200) {
-                BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(connection.getInputStream()));
-                String message = IOUtils.toString(bufferedReader);
+            try {
+                connection.connect();
+                if (connection.getResponseCode() == 200) {
+                    BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(connection.getInputStream()));
+                    String message = IOUtils.toString(bufferedReader);
 
-                zuluViewResponse = new ObjectMapper().readValue(message, ZuluViewResponse.class);
+                    zuluViewResponse = new ObjectMapper().readValue(message, ZuluViewResponse.class);
+                    connection.disconnect();
+                    return zuluViewResponse;
+                } else {
+                    System.out.println("zulu request retry for " + listingIds);
+                }
                 connection.disconnect();
-                return zuluViewResponse;
-            } else {
-                System.out.println("zulu request retry for " + listingIds);
+            } catch (Exception e) {
+                continue;
             }
-            connection.disconnect();
         }
         System.out.println("zulu retry exhausted for " + listingIds);
         return null;
