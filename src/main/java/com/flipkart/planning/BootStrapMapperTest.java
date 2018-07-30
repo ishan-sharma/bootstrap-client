@@ -5,17 +5,12 @@ import flipkart.dsp.santa.bernard.model.pricing.PricingNotificationKafkaMessage;
 import flipkart.pricing.libs.fatak.PriceObject;
 import flipkart.pricing.libs.fatak.PriceResponseV2;
 import org.apache.commons.io.IOUtils;
-import org.apache.hadoop.io.LongWritable;
-import org.apache.hadoop.io.Text;
-import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.StringSerializer;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
@@ -24,49 +19,49 @@ import java.util.Properties;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-public class BootStrapMapper extends Mapper<LongWritable, Text, Text, Text> {
-    private KafkaProducer<String, PricingNotificationKafkaMessage> kafkaProducer = null;
-    private List<String> listingIds = new ArrayList<>();
-    private int batchSize = 0;
+public class BootStrapMapperTest {
 
-    @Override
-    protected void setup(Mapper<LongWritable, Text, Text, Text>.Context context) throws IOException, InterruptedException {
-        super.setup(context);
+    private static KafkaProducer<String, PricingNotificationKafkaMessage> kafkaProducer = null;
+    private static List<String> listingIds = new ArrayList<>();
+    private static int batchSize = 0;
+
+    public static void setup() {
         Properties props = new Properties();
         props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG,
-                "10.34.37.255:9092");
+                "127.0.0.1:9092");
         props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG,
                 StringSerializer.class.getName());
         props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG,
                 KafkaSerializer.class.getName());
-       kafkaProducer =
+        kafkaProducer =
                 new KafkaProducer<>(props);
     }
 
-    @Override
-    protected void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException {
-        String line = value.toString();
+
+    protected static void map(String value) throws IOException, InterruptedException {
+        String line = value;
         List<String> fatakListings = new ArrayList<>();
 
         listingIds.add(line);
         batchSize++;
 
-        if(batchSize < 30) {
+        if (batchSize < 30) {
             //TODO: identify weather system.exit is correct ?
-            System.exit(0);
+            System.out.println("batchsize is "+batchSize);
+            return;
         }
-        System.out.println("Executing line " + line);
+        System.out.println("batchsize is 30 "+batchSize);
+
         System.out.println(line);
 
         String commaSeparatedListingIds = listingIds.stream().collect(Collectors.joining(","));
+        System.out.println("Executing line " + commaSeparatedListingIds);
         try {
             PriceResponseV2 priceResponseV2 = getFatakResponse(commaSeparatedListingIds);
-            if(priceResponseV2 == null)
-            {
+            if (priceResponseV2 == null) {
                 //TODO: write in hdfs file no1 fatak response not 200 after 3 retries
                 System.exit(0);
-            }
-            else {
+            } else {
                 priceResponseV2.getSuccess().forEach((PriceObject priceObject) ->
                         fatakListings.add(priceObject.getListingId()));
             }
@@ -85,22 +80,20 @@ public class BootStrapMapper extends Mapper<LongWritable, Text, Text, Text> {
                             System.currentTimeMillis());
 
                     ProducerRecord<String, PricingNotificationKafkaMessage> producerRecord =
-                            new ProducerRecord<>("tac_bootstrap_test"
+                            new ProducerRecord<>("tac-updates-preindex"
                                     , line
                                     , pricingNotificationKafkaMessage);
                     kafkaProducer.send(producerRecord);
                 });
-                zuluViewResponse.getUnavailableViews().forEach((UnavailableView unavailableView) ->{
+                zuluViewResponse.getUnavailableViews().forEach((UnavailableView unavailableView) -> {
                     //TODO: log entity id in hdfs file no 3 unavailableView.getEntityId(); (for zulu view not available)
                 });
             }
 
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             System.out.println("request failed");
-        }
-        finally {
-            if(batchSize == 30){
+        } finally {
+            if (batchSize == 30) {
                 batchSize = 0;
                 listingIds.clear();
             }
@@ -108,7 +101,7 @@ public class BootStrapMapper extends Mapper<LongWritable, Text, Text, Text> {
 
     }
 
-    private PriceResponseV2 getFatakResponse(String listingIds) throws IOException {
+    private static PriceResponseV2 getFatakResponse(String listingIds) throws IOException {
         String endpoint = "http://10.47.0.106:80/v2/listings/" + listingIds;
 
         HttpURLConnection connection;
@@ -140,7 +133,7 @@ public class BootStrapMapper extends Mapper<LongWritable, Text, Text, Text> {
 
     }
 
-    private ZuluViewResponse getZuluViewResponse(String listingId) throws IOException {
+    private static ZuluViewResponse getZuluViewResponse(String listingId) throws IOException {
         String endpoint = "http://10.47.1.8:31200/views?viewNames=dsp_pricing&entityIds=" + listingId;
 
         HttpURLConnection connection;
@@ -171,11 +164,17 @@ public class BootStrapMapper extends Mapper<LongWritable, Text, Text, Text> {
         return null;
     }
 
-    @Override
-    protected void cleanup(Context context) throws IOException, InterruptedException {
-        Thread.sleep(5000);
-        kafkaProducer.close();
-        //TODO: write in hdfs file no 4 for incomplete batch
-        super.cleanup(context);
+    public static void main(String[] args) throws IOException, InterruptedException {
+        setup();
+        String filePath = args[0];
+        String line;
+        File file = new File(filePath);
+
+        BufferedReader bufferedReader = new BufferedReader(new FileReader(file));
+        while ((line = bufferedReader.readLine()) != null) {
+            map(line.trim());
+        }
+        System.out.print("appended the file");
+        Thread.sleep(4000);
     }
 }
