@@ -63,7 +63,7 @@ public class BootStrapMapper extends Mapper<LongWritable, Text, Text, Text> {
             PriceResponseV2 priceResponseV2 = getFatakResponse(commaSeparatedListingIds);
             if(priceResponseV2 == null)
             {
-                //TODO: write in hdfs file no1 fatak response not 200 after 3 retries
+                context.write(new Text("FatakTimeout:"+commaSeparatedListingIds), new Text("1"));
                 System.exit(0);
             }
             else {
@@ -74,7 +74,7 @@ public class BootStrapMapper extends Mapper<LongWritable, Text, Text, Text> {
             String commaSeparatedListingIdsForZulu = fatakListings.stream().collect(Collectors.joining(","));
             ZuluViewResponse zuluViewResponse = getZuluViewResponse(commaSeparatedListingIdsForZulu);
             if (zuluViewResponse == null) {
-                //TODO: write in hdfs file no2 zulu response not 200 after 3 retries (for zulu retries)
+                context.write(new Text("ZuluTimeout:"+commaSeparatedListingIdsForZulu), new Text("1"));
             } else {
                 zuluViewResponse.getEntityViews().forEach((EntityView entityView) -> {
                     String listingId = entityView.getEntityId();
@@ -90,9 +90,10 @@ public class BootStrapMapper extends Mapper<LongWritable, Text, Text, Text> {
                                     , pricingNotificationKafkaMessage);
                     kafkaProducer.send(producerRecord);
                 });
-                zuluViewResponse.getUnavailableViews().forEach((UnavailableView unavailableView) ->{
-                    //TODO: log entity id in hdfs file no 3 unavailableView.getEntityId(); (for zulu view not available)
-                });
+                //TODO: log entity id in hdfs file no 3 unavailableView.getEntityId(); (for zulu view not available)
+                for (UnavailableView unavailableView : zuluViewResponse.getUnavailableViews()) {
+                    context.write(new Text("ZuluViewUnavailable:" + unavailableView.getEntityId()), new Text("1"));
+                }
             }
 
         }
@@ -175,7 +176,9 @@ public class BootStrapMapper extends Mapper<LongWritable, Text, Text, Text> {
     protected void cleanup(Context context) throws IOException, InterruptedException {
         Thread.sleep(5000);
         kafkaProducer.close();
-        //TODO: write in hdfs file no 4 for incomplete batch
+        for(String listingId: listingIds) {
+            context.write(new Text("IncompleteBatch:" + listingId), new Text("1"));
+        }
         super.cleanup(context);
     }
 }
