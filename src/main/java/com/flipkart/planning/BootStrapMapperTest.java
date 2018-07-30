@@ -60,7 +60,9 @@ public class BootStrapMapperTest {
             PriceResponseV2 priceResponseV2 = getFatakResponse(commaSeparatedListingIds);
             if (priceResponseV2 == null) {
                 //TODO: write in hdfs file no1 fatak response not 200 after 3 retries
-                System.exit(0);
+                batchSize = 0;
+                listingIds.clear();
+                return;
             } else {
                 priceResponseV2.getSuccess().forEach((PriceObject priceObject) ->
                         fatakListings.add(priceObject.getListingId()));

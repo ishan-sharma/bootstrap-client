@@ -64,6 +64,8 @@ public class BootStrapMapper extends Mapper<LongWritable, Text, Text, Text> {
             if(priceResponseV2 == null)
             {
                 context.write(new Text("FatakTimeout:"+commaSeparatedListingIds), new Text("1"));
+                batchSize = 0;
+                listingIds.clear();
                 return;
             }
             else {
