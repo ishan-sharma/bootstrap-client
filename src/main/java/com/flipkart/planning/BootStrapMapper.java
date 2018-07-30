@@ -35,7 +35,7 @@ public class BootStrapMapper extends Mapper<LongWritable, Text, Text, Text> {
         super.setup(context);
         Properties props = new Properties();
         props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG,
-                "10.33.18.124:9092,10.34.175.1:9092, 10.33.59.73:9092,10.33.219.21:9092, 10.34.181.45:9092");
+                "10.33.18.124:9092,10.34.175.1:9092,10.33.59.73:9092,10.33.219.21:9092,10.34.181.45:9092");
         props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG,
                 StringSerializer.class.getName());
         props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG,
