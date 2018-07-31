@@ -76,6 +76,7 @@ public class BootStrapMapper extends Mapper<LongWritable, Text, Text, Text> {
             String commaSeparatedListingIdsForZulu = fatakListings.stream().collect(Collectors.joining(","));
             ZuluViewResponse zuluViewResponse = getZuluViewResponse(commaSeparatedListingIdsForZulu);
             if (zuluViewResponse == null) {
+                if(commaSeparatedListingIdsForZulu.length()!=0)
                 context.write(new Text(commaSeparatedListingIdsForZulu), new Text("Z"));
             } else {
                 zuluViewResponse.getEntityViews().forEach((EntityView entityView) -> {
